@@ -1,0 +1,163 @@
+public class Program
+{
+    public static void Main()
+    {
+        Good iPhone12 = new Good("IPhone 12");
+        Good iPhone11 = new Good("IPhone 11");
+        Warehouse warehouse = new Warehouse();
+        Shop shop = new Shop(warehouse);
+
+        warehouse.Deliver(iPhone12, 10);
+        warehouse.Deliver(iPhone11, 1);
+
+        Cart cart = shop.Create();
+        cart.Add(iPhone12, 4);
+        cart.Add(iPhone11, 3);
+
+        TryAddToCart(cart, iPhone11, 3);
+        cart.PrintCart();
+
+        Console.WriteLine(cart.Checkout().Paylink);
+
+        TryAddToCart(cart, iPhone12, 9);
+    }
+
+    private static void TryAddToCart(Cart cart, Good good, int amount)
+    {
+        try
+        {
+            cart.Add(good, amount);
+        }
+        catch (InvalidOperationException e)
+        {
+            Console.WriteLine(e.Message);
+        }
+    }
+
+}
+
+public class Good
+{
+    public string Name { get; private set; }
+
+    public Good(string name)
+    {
+        Name = name;
+    }
+}
+
+public class Order
+{
+    public string Paylink { get; private set; }
+
+    public Order(string paylink)
+    {
+        Paylink = paylink;
+    }
+}
+
+public class Shop
+{
+    private readonly Warehouse _warehouse;
+
+    public Shop(Warehouse warehouse)
+    {
+        _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
+    }
+
+    public Cart Create()
+    {
+        return new Cart(_warehouse);
+    }
+}
+
+public class Warehouse
+{
+    private readonly Dictionary<Good, int> _goods = new Dictionary<Good, int>();
+
+    public void Deliver(Good good, int amount)
+    {
+        Validator.ValidateGood(good);
+        Validator.ValidateAmount(amount);
+
+        if (_goods.ContainsKey(good))
+            _goods[good] += amount;
+        else
+            _goods[good] = amount;
+    }
+
+    public int CheckStock(Good good)
+    {
+        Validator.ValidateGood(good);
+
+        return _goods.TryGetValue(good, out int amount) ? amount : 0;
+    }
+
+    public bool Remove(Good good, int amount)
+    {
+        Validator.ValidateGood(good);
+        Validator.ValidateAmount(amount);
+
+        if (CheckStock(good) >= amount)
+        {
+            _goods[good] -= amount;
+            return true;
+        }
+
+        return false;
+    }
+}
+
+public class Cart
+{
+    private readonly Warehouse _warehouse;
+    private readonly Dictionary<Good, int> _items = new Dictionary<Good, int>();
+
+    public Cart(Warehouse warehouse)
+    {
+        _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
+    }
+
+    public void Add(Good good, int amount)
+    {
+        Validator.ValidateGood(good);
+        Validator.ValidateAmount(amount);
+
+        if (_warehouse.CheckStock(good) < amount)
+            throw new InvalidOperationException("Недостаточно запасов.");
+
+        if (_items.ContainsKey(good))
+            _items[good] += amount;
+        else
+            _items[good] = amount;
+
+        if(!_warehouse.Remove(good, amount))
+            throw new InvalidOperationException("Не удалось удалить товары со склада.");
+    }
+
+    public void PrintCart()
+    {
+        foreach (var item in _items)
+            Console.WriteLine($"{item.Key.Name} - {item.Value}");
+    }
+
+    public Order Checkout()
+    {
+        return new Order("http://payment.link");
+    }
+}
+
+public static class Validator
+{
+    public static void ValidateGood(Good good)
+    {
+        if (good == null)
+            throw new ArgumentNullException(nameof(good));
+    }
+
+    public static void ValidateAmount(int amount)
+    {
+        if (amount <= 0)
+            throw new ArgumentException("Сумма должна быть больше 0.", nameof(amount));
+    }
+}
