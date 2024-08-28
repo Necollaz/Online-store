@@ -7,53 +7,47 @@ public class Program
         Warehouse warehouse = new Warehouse();
         Shop shop = new Shop(warehouse);
 
-        warehouse.Deliver(iPhone12, 10);
-        warehouse.Deliver(iPhone11, 1);
+        warehouse.Delive(iPhone12, 10);
+        warehouse.Delive(iPhone11, 1);
 
-        Cart cart = shop.Create();
+        Cart cart = shop.Cart();
         cart.Add(iPhone12, 4);
         cart.Add(iPhone11, 3);
 
-        TryAddToCart(cart, iPhone11, 3);
-        cart.PrintCart();
+        Console.WriteLine(cart.Order().Paylink);
 
-        Console.WriteLine(cart.Checkout().Paylink);
-
-        TryAddToCart(cart, iPhone12, 9);
+        cart.Add(iPhone12, 9);
     }
+}
 
-    private static void TryAddToCart(Cart cart, Good good, int amount)
-    {
-        try
-        {
-            cart.Add(good, amount);
-        }
-        catch (InvalidOperationException e)
-        {
-            Console.WriteLine(e.Message);
-        }
-    }
-
+public interface IWarehouse
+{
+    int GetStockQuantity(Good good);
+    bool Remove(Good good, int amount);
 }
 
 public class Good
 {
-    public string Name { get; private set; }
+    private string _name;
 
     public Good(string name)
     {
-        Name = name;
+        _name = name;
     }
+
+    public string Name { get => _name; }
 }
 
 public class Order
 {
-    public string Paylink { get; private set; }
+    private string _paylink;
 
     public Order(string paylink)
     {
-        Paylink = paylink;
+        _paylink = paylink;
     }
+
+    public string Paylink { get => _paylink; }
 }
 
 public class Shop
@@ -65,17 +59,17 @@ public class Shop
         _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
     }
 
-    public Cart Create()
+    public Cart Cart()
     {
         return new Cart(_warehouse);
     }
 }
 
-public class Warehouse
+public class Warehouse : IWarehouse
 {
     private readonly Dictionary<Good, int> _goods = new Dictionary<Good, int>();
 
-    public void Deliver(Good good, int amount)
+    public void Delive(Good good, int amount)
     {
         Validator.ValidateGood(good);
         Validator.ValidateAmount(amount);
@@ -86,7 +80,7 @@ public class Warehouse
             _goods[good] = amount;
     }
 
-    public int CheckStock(Good good)
+    public int GetStockQuantity(Good good)
     {
         Validator.ValidateGood(good);
 
@@ -98,7 +92,7 @@ public class Warehouse
         Validator.ValidateGood(good);
         Validator.ValidateAmount(amount);
 
-        if (CheckStock(good) >= amount)
+        if (GetStockQuantity(good) >= amount)
         {
             _goods[good] -= amount;
             return true;
@@ -110,10 +104,10 @@ public class Warehouse
 
 public class Cart
 {
-    private readonly Warehouse _warehouse;
+    private readonly IWarehouse _warehouse;
     private readonly Dictionary<Good, int> _items = new Dictionary<Good, int>();
 
-    public Cart(Warehouse warehouse)
+    public Cart(IWarehouse warehouse)
     {
         _warehouse = warehouse ?? throw new ArgumentNullException(nameof(warehouse));
     }
@@ -123,16 +117,13 @@ public class Cart
         Validator.ValidateGood(good);
         Validator.ValidateAmount(amount);
 
-        if (_warehouse.CheckStock(good) < amount)
+        if (_warehouse.GetStockQuantity(good) < amount)
             throw new InvalidOperationException("Недостаточно запасов.");
 
         if (_items.ContainsKey(good))
             _items[good] += amount;
         else
             _items[good] = amount;
-
-        if(!_warehouse.Remove(good, amount))
-            throw new InvalidOperationException("Не удалось удалить товары со склада.");
     }
 
     public void PrintCart()
@@ -141,8 +132,16 @@ public class Cart
             Console.WriteLine($"{item.Key.Name} - {item.Value}");
     }
 
-    public Order Checkout()
+    public Order Order()
     {
+        foreach (var item in _items)
+        {
+            if (!_warehouse.Remove(item.Key, item.Value))
+            {
+                throw new InvalidOperationException("Не удалось удалить товары со склада.");
+            }
+        }
+
         return new Order("http://payment.link");
     }
 }
