@@ -28,26 +28,22 @@ public interface IWarehouse
 
 public class Good
 {
-    private string _name;
-
     public Good(string name)
     {
-        _name = name;
+        Name = name;
     }
 
-    public string Name { get => _name; }
+    public string Name { get; private set; }
 }
 
 public class Order
 {
-    private string _paylink;
-
     public Order(string paylink)
     {
-        _paylink = paylink;
+        Paylink = paylink;
     }
 
-    public string Paylink { get => _paylink; }
+    public string Paylink { get; private set; }
 }
 
 public class Shop
@@ -117,13 +113,13 @@ public class Cart
         Validator.ValidateGood(good);
         Validator.ValidateAmount(amount);
 
-        if (_warehouse.GetStockQuantity(good) < amount)
+        int currentAmountInCart = _items.ContainsKey(good) ? _items[good] : 0;
+        int totalAmountDesired = currentAmountInCart + amount;
+
+        if (_warehouse.GetStockQuantity(good) < totalAmountDesired)
             throw new InvalidOperationException("Недостаточно запасов.");
 
-        if (_items.ContainsKey(good))
-            _items[good] += amount;
-        else
-            _items[good] = amount;
+        _items[good] = totalAmountDesired;
     }
 
     public void PrintCart()
@@ -136,7 +132,7 @@ public class Cart
     {
         foreach (var item in _items)
         {
-            if (!_warehouse.Remove(item.Key, item.Value))
+            if (_warehouse.Remove(item.Key, item.Value) == false)
             {
                 throw new InvalidOperationException("Не удалось удалить товары со склада.");
             }
